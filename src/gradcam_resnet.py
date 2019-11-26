@@ -22,27 +22,48 @@ class CamExtractor():
     def save_gradient(self, grad):
         self.gradients = grad
 
-    def forward_pass_on_convolutions(self, x):
-        """
-            Does a forward pass on convolutions, hooks the function at given layer
-        """
-        conv_output = None
-        for module_pos, module in self.model.features._modules.items():
-            x = module(x)  # Forward
-            if int(module_pos) == self.target_layer:
-                x.register_hook(self.save_gradient)
-                conv_output = x  # Save the convolution output on that layer
-        return conv_output, x
+    # def forward_pass_on_convolutions(self, x):
+    #     """
+    #         Does a forward pass on convolutions, hooks the function at given layer
+    #     """
+    #     conv_output = None
+    #     for module_pos, module in self.model.features._modules.items():
+    #         x = module(x)  # Forward
+    #         if int(module_pos) == self.target_layer:
+    #             x.register_hook(self.save_gradient)
+    #             conv_output = x  # Save the convolution output on that layer
+    #     return conv_output, x
+
+    # def forward_pass(self, x):
+    #     """
+    #         Does a full forward pass on the model
+    #     """
+    #     # Forward pass on the convolutions
+    #     conv_output, x = self.forward_pass_on_convolutions(x)
+    #     x = x.view(x.size(0), -1)  # Flatten
+    #     # Forward pass on the classifier
+    #     x = self.model.classifier(x)
+    #     return conv_output, x
 
     def forward_pass(self, x):
-        """
-            Does a full forward pass on the model
-        """
-        # Forward pass on the convolutions
-        conv_output, x = self.forward_pass_on_convolutions(x)
-        x = x.view(x.size(0), -1)  # Flatten
-        # Forward pass on the classifier
-        x = self.model.classifier(x)
+        x = self.model.conv1(x)
+        x = self.model.bn1(x)
+        x = self.model.relu(x)
+        x = self.model.maxpool(x)
+
+        x = self.model.layer1(x)
+        x = self.model.layer2(x)
+        x = self.model.layer3(x)
+        x = self.model.layer4(x)
+
+        # only support target_layer == layer4
+        x.register_hook(self.save_gradient)
+        conv_output = x  # Save the convolution output on that layer
+
+        x = self.model.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.model.fc(x)
+
         return conv_output, x
 
 
@@ -67,8 +88,10 @@ class GradCam():
         one_hot_output = torch.FloatTensor(1, model_output.size()[-1]).zero_()
         one_hot_output[0][target_class] = 1
         # Zero grads
-        self.model.features.zero_grad()
-        self.model.classifier.zero_grad()
+        # self.model.features.zero_grad()
+        # self.model.classifier.zero_grad()
+        for m in self.model.modules():
+            m.zero_grad()
         # Backward pass with specified target
         model_output.backward(gradient=one_hot_output, retain_graph=True)
         # Get hooked gradients
@@ -102,9 +125,10 @@ if __name__ == '__main__':
     # target_example = 0  # Snake
     target_example = 1 # cat_dog
     (original_image, prep_img, target_class, file_name_to_export, pretrained_model) =\
-        get_example_params(target_example)
+        get_example_params(target_example, 'resnet50')
     # Grad cam
-    grad_cam = GradCam(pretrained_model, target_layer=11)
+    # grad_cam = GradCam(pretrained_model, target_layer=11)
+    grad_cam = GradCam(pretrained_model, target_layer='layer4')
     # Generate cam mask
     cam = grad_cam.generate_cam(prep_img, target_class)
     # Save mask

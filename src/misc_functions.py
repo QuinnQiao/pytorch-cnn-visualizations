@@ -62,7 +62,7 @@ def save_class_activation_images(org_img, activation_map, file_name):
     if not os.path.exists('../results'):
         os.makedirs('../results')
     # Grayscale activation map
-    heatmap, heatmap_on_image = apply_colormap_on_image(org_img, activation_map, 'hsv')
+    heatmap, heatmap_on_image = apply_colormap_on_image(org_img, activation_map, 'rainbow')
     # Save colored heatmap
     path_to_file = os.path.join('../results', file_name+'_Cam_Heatmap.png')
     save_image(heatmap, path_to_file)
@@ -206,7 +206,7 @@ def get_positive_negative_saliency(gradient):
     return pos_saliency, neg_saliency
 
 
-def get_example_params(example_index):
+def get_example_params(example_index, example_network=None):
     """
         Gets used variables for almost all visualizations, like the image, model etc.
 
@@ -232,7 +232,14 @@ def get_example_params(example_index):
     # Process image
     prep_img = preprocess_image(original_image)
     # Define model
-    pretrained_model = models.alexnet(pretrained=True)
+    if example_network is None:
+        pretrained_model = models.alexnet(pretrained=True)
+    elif example_network == 'vgg16':
+        pretrained_model = models.vgg16(pretrained=True)
+    elif example_network == 'resnet50':
+        pretrained_model = models.resnet50(pretrained=True)
+    else:
+        assert 0, 'Unsupported network'
     return (original_image,
             prep_img,
             target_class,
