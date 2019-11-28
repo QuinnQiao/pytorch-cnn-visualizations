@@ -100,5 +100,5 @@ ENV/
 # mypy
 .mypy_cache/
 
-results/AlexNet/
-results/ResNet50/
+results/GradCAM/
+results/CAM/
